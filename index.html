@@ -18,163 +18,36 @@ function toast(t){const e=document.getElementById('toast');e.textContent=t;e.cla
 function speak(t){if('speechSynthesis'in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ja-JP';u.rate=.98;speechSynthesis.speak(u)}}
 function parseAndRespond(text){
  setState('THINKING...','考えてるモン。');
- setTimeout(()=>{
-   const q = text.replace(/[。！？!?]/g,'');
-   // =========================
-   // ① 2026年の回数
-   // =========================
-   if(/何回|何件|回数/.test(q) && /今年|2026/.test(q)){
-     const n = records.filter(
-       r => new Date(r.date).getFullYear() === 2026
-     ).length;
-     respond(`2026年のビーモンスターは${n}回ですモン。`);
-     return;
-   }
-   // =========================
-   // ② b-monster登録
-   // =========================
-   if(
-     /ビーモンスター|b-monster|bモンスター|ビーモン/i.test(q) &&
-     /行った|行きました|受けた|受けました|参加した|参加しました/.test(q)
-   ){
-     // =========================
-     // 日付
-     // =========================
-     const today = new Date();
-     let recordDate = new Date(today);
-     if(/昨日/.test(q)){
-       recordDate.setDate(recordDate.getDate() - 1);
-     }
-     if(/一昨日/.test(q)){
-       recordDate.setDate(recordDate.getDate() - 2);
-     }
-     const date =
-       recordDate.toISOString().slice(0,10);
-     // =========================
-     // パフォーマー
-     // =========================
-     let performer = '';
-     // まず既知のPF名を拾う
-     const pfMatch = q.match(/Vivi|TOHYA/i);
-     if(pfMatch){
-       performer = pfMatch[0];
-     }
-     // 「ViviのMIX1」のような形
-     if(!performer){
-       const pfPattern = q.match(
-         /([A-Za-zＡ-Ｚａ-ｚ]+)の/
-       );
-       if(pfPattern){
-         performer = pfPattern[1].trim();
-       }
-     }
-     // 「パフォーマーはVivi」形式も対応
-     if(!performer){
-       const performerMatch = q.match(
-         /(?:パフォーマー|インストラクター|PF)[:：は ]+(.+?)(?=の|、|,|を|受け|参加|$)/i
-       );
-       if(performerMatch){
-         performer = performerMatch[1].trim();
-       }
-     }
-     // =========================
-     // プログラム
-     // =========================
-     let program = '';
-     // 「ViviのMIX1」
-     if(pfMatch){
-       const afterPF =
-         q.substring(
-           pfMatch.index + pfMatch[0].length
-         );
-       const programMatch =
-         afterPF.match(/の([^、, ]+)/);
-       if(programMatch){
-         program = programMatch[1].trim();
-       }
-     }
-     // 「プログラムはMIX1」形式にも対応
-     if(!program){
-       const programMatch = q.match(
-         /(?:プログラム|クラス)[:：は ]+(.+?)(?=、|,|を|受け|参加|$)/i
-       );
-       if(programMatch){
-         program =
-           programMatch[1].trim();
-       }
-     }
-     // =========================
-     // スタジオ
-     // =========================
-     // デフォルトは梅田
-     let studio = '梅田';
-     // 「梅田」と言われた場合
-     if(/梅田/.test(q)){
-       studio = '梅田';
-     }
-     // 明示的に別スタジオを指定した場合
-     const studioMatch = q.match(
-       /(?:スタジオ|店舗)[:：は ]+(.+?)(?=、|,|で|を|受け|参加|$)/i
-     );
-     if(studioMatch){
-       studio =
-         studioMatch[1].trim();
-     }
-     // =========================
-     // Notionへ送信
-     // =========================
-     const rec = {
-       date: date,
-       bmonster: 'b-monster',
-       program: program,
-       performer: performer,
-       studio: studio,
+ fetch(
+   'https://jarvis.exiletypeth.workers.dev/',
+   {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json'
+     },
+     body: JSON.stringify({
        raw: text
-     };
-     // ローカル保存
-     records.push(rec);
-     localStorage.setItem(
-       'jarvis_bmonster',
-       JSON.stringify(records)
-     );
-     // =========================
-     // Cloudflare Worker
-     // =========================
-     fetch(
-       'https://jarvis.exiletypeth.workers.dev/',
-       {
-         method: 'POST',
-         headers: {
-           'Content-Type': 'application/json'
-         },
-         body: JSON.stringify(rec)
-       }
-     )
-     .then(r => r.json())
-     .then(data => {
-       if(data.object === 'page'){
-         respond(
-           `${date}、${performer || 'パフォーマー未入力'}、${program || 'プログラム未入力'}、${studio}でNotionに登録したモン。`
-         );
-       }else{
-         respond(
-           `Notion登録エラー：${
-             data.error ||
-             data.message ||
-             JSON.stringify(data)
-           } モン。`
-         );
-       }
      })
-     .catch(()=>{
-       respond(
-         'b-monsterは記録したモン。ただしNotionへの接続でエラーが出たモン。'
-       );
-     });
-     return;
    }
-   respond('まだうまく理解できなかったモン。');
- },500);
+ )
+ .then(r => r.json())
+ .then(data => {
+   if(data.ok){
+     const ai = data.ai || {};
+     respond(
+       `${ai.date || ''}、${ai.performer || 'パフォーマー未入力'}、${ai.program || 'プログラム未入力'}、${ai.studio || '梅田'}でNotionに登録したモン。`
+     );
+   }else{
+     respond(
+       `登録できなかったモン。${data.error || 'エラーが発生したモン。'}`
+     );
+   }
+ })
+ .catch(error => {
+   respond(
+     'Cloudflareとの接続でエラーが出たモン。'
+   );
+ });
 }
 function respond(t){setState('RESPONDING...','できたモン！');result.innerHTML='<small>JARVIS</small><br><b>'+t+'</b>';result.classList.add('show');speak(t);setTimeout(()=>setState('STANDBY','話しかけてほしいモン。'),2500)}
 function toggleMic(){if(listening){stopMic();return}if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){toast('このブラウザは音声認識に未対応モン');return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;recognition=new R();recognition.lang='ja-JP';recognition.continuous=false;recognition.interimResults=true;recognition.onstart=()=>{listening=true;mic.classList.add('listening');setState('LISTENING...','聞いてるモン！')};recognition.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)text+=e.results[i][0].transcript;if(e.results[e.results.length-1].isFinal){stopMic();parseAndRespond(text)}};recognition.onerror=e=>{stopMic();toast('音声認識エラー: '+e.error+' モン')};recognition.onend=()=>{listening=false;mic.classList.remove('listening')};recognition.start()}
