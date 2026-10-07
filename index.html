@@ -21,7 +21,7 @@ function parseAndRespond(text){
  setTimeout(()=>{
    const q = text.replace(/[。！？!?]/g,'');
    // =========================
-   // ① 2026年の回数を聞かれた場合
+   // ① 2026年の回数
    // =========================
    if(/何回|何件|回数/.test(q) && /今年|2026/.test(q)){
      const n = records.filter(
@@ -31,97 +31,136 @@ function parseAndRespond(text){
      return;
    }
    // =========================
-   // ② b-monsterに行った／受けた
+   // ② b-monster登録
    // =========================
    if(
      /ビーモンスター|b-monster|bモンスター|ビーモン/i.test(q) &&
      /行った|行きました|受けた|受けました|参加した|参加しました/.test(q)
    ){
-     // -------------------------
-     // プログラム
-     // -------------------------
-     let program = '';
-     // 「プログラムは○○」
-     let programMatch = q.match(
-       /(?:プログラム|クラス)[:：は ]+(.+?)(?=を|に|で|受け|参加|行った|行きました|でした|です|$)/i
-     );
-     if(programMatch){
-       program = programMatch[1].trim();
+     // =========================
+     // 日付
+     // =========================
+     const today = new Date();
+     let recordDate = new Date(today);
+     if(/昨日/.test(q)){
+       recordDate.setDate(recordDate.getDate() - 1);
      }
-     // -------------------------
+     if(/一昨日/.test(q)){
+       recordDate.setDate(recordDate.getDate() - 2);
+     }
+     const date =
+       recordDate.toISOString().slice(0,10);
+     // =========================
      // パフォーマー
-     // -------------------------
+     // =========================
      let performer = '';
-     // 「パフォーマーはVivi」
-     let performerMatch = q.match(
-       /(?:パフォーマー|インストラクター|PF)[:：は ]+(.+?)(?=を|に|で|受け|参加|行った|行きました|でした|です|$)/i
-     );
-     if(performerMatch){
-       performer = performerMatch[1].trim();
+     // まず既知のPF名を拾う
+     const pfMatch = q.match(/Vivi|TOHYA/i);
+     if(pfMatch){
+       performer = pfMatch[0];
      }
-     // 「Vivi」「TOHYA」は直接拾う
+     // 「ViviのMIX1」のような形
      if(!performer){
-       const pfMatch = q.match(/Vivi|TOHYA/i);
-       if(pfMatch){
-         performer = pfMatch[0];
+       const pfPattern = q.match(
+         /([A-Za-zＡ-Ｚａ-ｚ]+)の/
+       );
+       if(pfPattern){
+         performer = pfPattern[1].trim();
        }
      }
-     // -------------------------
-     // スタジオ
-     // -------------------------
-     // 何も言わなければ梅田
-     let studio = '梅田';
-     // 明示的に「スタジオは○○」と言った場合だけ変更
-     const studioMatch = q.match(
-       /(?:スタジオ|店舗)[:：は ]+(.+?)(?=で|を|に|受け|参加|行った|行きました|でした|です|$)/i
-     );
-     if(studioMatch){
-       studio = studioMatch[1].trim();
+     // 「パフォーマーはVivi」形式も対応
+     if(!performer){
+       const performerMatch = q.match(
+         /(?:パフォーマー|インストラクター|PF)[:：は ]+(.+?)(?=の|、|,|を|受け|参加|$)/i
+       );
+       if(performerMatch){
+         performer = performerMatch[1].trim();
+       }
      }
-     // 「梅田」が含まれていれば梅田
+     // =========================
+     // プログラム
+     // =========================
+     let program = '';
+     // 「ViviのMIX1」
+     if(pfMatch){
+       const afterPF =
+         q.substring(
+           pfMatch.index + pfMatch[0].length
+         );
+       const programMatch =
+         afterPF.match(/の([^、, ]+)/);
+       if(programMatch){
+         program = programMatch[1].trim();
+       }
+     }
+     // 「プログラムはMIX1」形式にも対応
+     if(!program){
+       const programMatch = q.match(
+         /(?:プログラム|クラス)[:：は ]+(.+?)(?=、|,|を|受け|参加|$)/i
+       );
+       if(programMatch){
+         program =
+           programMatch[1].trim();
+       }
+     }
+     // =========================
+     // スタジオ
+     // =========================
+     // デフォルトは梅田
+     let studio = '梅田';
+     // 「梅田」と言われた場合
      if(/梅田/.test(q)){
        studio = '梅田';
      }
+     // 明示的に別スタジオを指定した場合
+     const studioMatch = q.match(
+       /(?:スタジオ|店舗)[:：は ]+(.+?)(?=、|,|で|を|受け|参加|$)/i
+     );
+     if(studioMatch){
+       studio =
+         studioMatch[1].trim();
+     }
      // =========================
-     // Notionへ送るデータ
+     // Notionへ送信
      // =========================
      const rec = {
-       date: new Date().toISOString().slice(0,10),
+       date: date,
        bmonster: 'b-monster',
        program: program,
        performer: performer,
        studio: studio,
        raw: text
      };
-     // =========================
-     // ローカルにも保存
-     // =========================
+     // ローカル保存
      records.push(rec);
      localStorage.setItem(
        'jarvis_bmonster',
        JSON.stringify(records)
      );
      // =========================
-     // Cloudflare Worker → Notion
+     // Cloudflare Worker
      // =========================
-     fetch('https://jarvis.exiletypeth.workers.dev/', {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json'
-       },
-       body: JSON.stringify(rec)
-     })
+     fetch(
+       'https://jarvis.exiletypeth.workers.dev/',
+       {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json'
+         },
+         body: JSON.stringify(rec)
+       }
+     )
      .then(r => r.json())
      .then(data => {
        if(data.object === 'page'){
          respond(
-           `今日のb-monsterをNotionに記録したモン。`
+           `${date}、${performer || 'パフォーマー未入力'}、${program || 'プログラム未入力'}、${studio}でNotionに登録したモン。`
          );
        }else{
          respond(
            `Notion登録エラー：${
-             data.message ||
              data.error ||
+             data.message ||
              JSON.stringify(data)
            } モン。`
          );
@@ -129,14 +168,11 @@ function parseAndRespond(text){
      })
      .catch(()=>{
        respond(
-         `b-monsterは記録したモン。Notionへの接続でエラーが出たモン。`
+         'b-monsterは記録したモン。ただしNotionへの接続でエラーが出たモン。'
        );
      });
      return;
    }
-   // =========================
-   // 理解できなかった場合
-   // =========================
    respond('まだうまく理解できなかったモン。');
  },500);
 }
