@@ -44,9 +44,9 @@ function parseAndRespond(text){
      })
      .then(r=>r.json())
      .then(data=>{
- if(data.object){
-   respond(`今日のb-monsterをNotionに記録したモン。`);
- }else{
+if(data.object){
+ respond(`Notion登録成功。ページURL：${data.url || 'URL取得できず'} モン。`);
+}else{
    respond(`Notion登録エラー：${data.message || data.error || '原因不明'} モン。`);
  }
 })
