@@ -16,38 +16,49 @@ let recognition=null,listening=false,records=JSON.parse(localStorage.getItem('ja
 function setState(s,j){state.textContent=s;jp.textContent=j;mascot.className='mascot '+s.toLowerCase().replace('...','');wave.classList.toggle('on',s==='LISTENING...');halo.classList.toggle('active',s!=='STANDBY');}
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1800)}
 function speak(t){if('speechSynthesis'in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ja-JP';u.rate=.98;speechSynthesis.speak(u)}}
-function parseAndRespond(text){setState('THINKING...','考えてるモン。');setTimeout(()=>{
- const q=text.replace(/[。！？!?]/g,'');
- if(/何回|何件|回数/.test(q)&&/今年|2026/.test(q)){const n=records.filter(r=>new Date(r.date).getFullYear()===2026).length;respond(`2026年のビーモンスターは${n}回ですモン。`);return}
- const hard=/HARD/i.test(q)?'HARD':(/NORMAL|ノーマル/i.test(q)?'NORMAL':null);const m=q.match(/Vivi|TOHYA|インストラクター[:： ]?([^ ]+)/i);if(/ビーモンスター|b-monster|ビー?モン/.test(q)&&(/行った|受けた|行きました|参加/.test(q))){
- const rec={
-   date:new Date().toISOString().slice(0,10),
-   bmonster:'b-monster',
-   program:hard||'未入力',
-   studio:'未入力',
-   raw:text
- };
- records.push(rec);
- localStorage.setItem('jarvis_bmonster',JSON.stringify(records));
- fetch('https://jarvis.exiletypeth.workers.dev/',{
-   method:'POST',
-   headers:{'Content-Type':'application/json'},
-   body:JSON.stringify(rec)
- })
- .then(r=>r.json())
- .then(data=>{
-   if(data.object){
-     respond(`今日のb-monsterをNotionに記録したモン。`);
-   }else{
-     respond(`b-monsterは記録したモン。ただしNotionへの登録を確認できなかったモン。`);
+function parseAndRespond(text){
+ setState('THINKING...','考えてるモン。');
+ setTimeout(()=>{
+   const q=text.replace(/[。！？!?]/g,'');
+   if(/何回|何件|回数/.test(q)&&/今年|2026/.test(q)){
+     const n=records.filter(r=>new Date(r.date).getFullYear()===2026).length;
+     respond(`2026年のビーモンスターは${n}回ですモン。`);
+     return;
    }
- })
- .catch(()=>{
-   respond(`b-monsterは記録したモン。Notionへの接続でエラーが出たモン。`);
- });
- return;
+   const hard=/HARD/i.test(q)?'HARD':(/NORMAL|ノーマル/i.test(q)?'NORMAL':null);
+   const m=q.match(/Vivi|TOHYA|インストラクター[:： ]?([^ ]+)/i);
+   if(/ビーモンスター|b-monster|ビー?モン/.test(q)&&(/行った|受けた|行きました|参加/.test(q))){
+     const rec={
+       date:new Date().toISOString().slice(0,10),
+       bmonster:'b-monster',
+       program:hard||'未入力',
+       studio:'未入力',
+       raw:text
+     };
+     records.push(rec);
+     localStorage.setItem('jarvis_bmonster',JSON.stringify(records));
+     fetch('https://jarvis.exiletypeth.workers.dev/',{
+       method:'POST',
+       headers:{'Content-Type':'application/json'},
+       body:JSON.stringify(rec)
+     })
+     .then(r=>r.json())
+     .then(data=>{
+       if(data.object){
+         respond(`今日のb-monsterをNotionに記録したモン。`);
+       }else{
+         respond(`b-monsterは記録したモン。ただしNotionへの登録を確認できなかったモン。`);
+       }
+     })
+     .catch(()=>{
+       respond(`b-monsterは記録したモン。Notionへの接続でエラーが出たモン。`);
+     });
+     return;
+   }
+   respond('まだうまく理解できなかったモン。');
+ },500);
 }
-function respond(t){setState('RESPONDING...','できたモン！');result.innerHTML='<small>JARVIS</small><br><b>'+t+'</b>';result.classList.add('show');speak(t);setTimeout(()=>setState('STANDBY','話しかけてほしいモン。'),2500)}
+ function respond(t){setState('RESPONDING...','できたモン！');result.innerHTML='<small>JARVIS</small><br><b>'+t+'</b>';result.classList.add('show');speak(t);setTimeout(()=>setState('STANDBY','話しかけてほしいモン。'),2500)}
 function toggleMic(){if(listening){stopMic();return}if(!('webkitSpeechRecognition'in window||'SpeechRecognition'in window)){toast('このブラウザは音声認識に未対応モン');return}const R=window.SpeechRecognition||window.webkitSpeechRecognition;recognition=new R();recognition.lang='ja-JP';recognition.continuous=false;recognition.interimResults=true;recognition.onstart=()=>{listening=true;mic.classList.add('listening');setState('LISTENING...','聞いてるモン！')};recognition.onresult=e=>{let text='';for(let i=e.resultIndex;i<e.results.length;i++)text+=e.results[i][0].transcript;if(e.results[e.results.length-1].isFinal){stopMic();parseAndRespond(text)}};recognition.onerror=e=>{stopMic();toast('音声認識エラー: '+e.error+' モン')};recognition.onend=()=>{listening=false;mic.classList.remove('listening')};recognition.start()}
 function stopMic(){if(recognition)recognition.stop();listening=false;mic.classList.remove('listening');}
 function showRecords(){openSheet();document.querySelector('.sheet').innerHTML='<button class="close" onclick="closeSheet()">×</button><h2>RECORDS / b-monster</h2>'+ (records.length?records.slice().reverse().map(r=>`<div class="item"><span>${new Date(r.date).toLocaleDateString('ja-JP')}<br><small>${r.class} / ${r.instructor}</small></span><span>●</span></div>`).join(''):'<p style="color:#999">まだ記録がないモン。</p>');}
