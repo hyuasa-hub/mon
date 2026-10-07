@@ -44,12 +44,12 @@ function parseAndRespond(text){
      })
      .then(r=>r.json())
      .then(data=>{
-       if(data.object){
-         respond(`今日のb-monsterをNotionに記録したモン。`);
-       }else{
-         respond(`b-monsterは記録したモン。ただしNotionへの登録を確認できなかったモン。`);
-       }
-     })
+ if(data.object){
+   respond(`今日のb-monsterをNotionに記録したモン。`);
+ }else{
+   respond(`Notion登録エラー：${data.message || data.error || '原因不明'} モン。`);
+ }
+})
      .catch(()=>{
        respond(`b-monsterは記録したモン。Notionへの接続でエラーが出たモン。`);
      });
