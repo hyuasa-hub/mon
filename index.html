@@ -38,10 +38,16 @@ function parseAndRespond(text){
        `${ai.date || ''}、${ai.performer || 'パフォーマー未入力'}、${ai.program || 'プログラム未入力'}、${ai.studio || '梅田'}でNotionに登録したモン。`
      );
    }else{
-     respond(
-       `登録できなかったモン。${data.error || 'エラーが発生したモン。'}`
-     );
-   }
+ const detail = data.received
+   ? ` 判定名：${data.received}。`
+   : '';
+ const options = data.availablePrograms
+   ? ` 登録候補：${data.availablePrograms.join('、')}。`
+   : '';
+ respond(
+   `登録できなかったモン。${data.error || 'エラーが発生したモン。'}${detail}${options}`
+ );
+}
  })
  .catch(error => {
    respond(
